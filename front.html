@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>किसान मित्र - Crop Predictor | कृषि सलाहकार</title>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:Segoe UI,system-ui,Arial; background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;padding:20px}
+  .container{max-width:1200px;margin:0 auto}
+  .header{color:#fff;text-align:center;position:relative;margin-bottom:30px}
+  .language-toggle{position:absolute;right:0;top:0;background:rgba(255,255,255,0.15);padding:10px 16px;border-radius:20px;cursor:pointer;display:flex;align-items:center;gap:8px}
+  .main-card{background:#fff;border-radius:16px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;min-height:600px;box-shadow:0 20px 40px rgba(2,6,23,0.12)}
+  .input-section{padding:36px;background:linear-gradient(145deg,#f8f9ff,#e8ecff);border-right:1px solid #e6e6e6}
+  .output-section{padding:36px;background:linear-gradient(145deg,#fff8f0,#f0f8ff);display:flex;flex-direction:column;align-items:center;justify-content:center}
+  .form-group{margin-bottom:16px}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  label{display:block;font-weight:600;margin-bottom:8px;color:#333}
+  .form-control{width:100%;padding:10px 12px;border-radius:10px;border:2px solid #e6e6e6;font-size:1rem;background:#fff}
+  .form-control:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 4px rgba(102,126,234,0.06)}
+  .predict-btn{width:100%;padding:14px;border-radius:10px;border:none;background:linear-gradient(45deg,#ff6b6b,#ee5a24);color:#fff;font-weight:700;cursor:pointer}
+  .mini-gauge{width:140px;height:88px;flex:0 0 140px}
+  .input-with-gauge{display:flex;align-items:center;gap:12px}
+  .value-badge{min-width:60px;text-align:center;padding:6px 8px;border-radius:8px;border:1px solid #eee;background:#fff;font-weight:700}
+  .result-card{background:#fff;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 10px 20px rgba(8,15,20,0.06);width:100%}
+  @media(max-width:768px){.main-card{grid-template-columns:1fr}.form-row{grid-template-columns:1fr}.mini-gauge{width:110px;height:74px}}
+  .needle{transform-origin:50% 85%;transition:transform .45s cubic-bezier(.22,.9,.32,1)}
+  .arc{transition:stroke-dashoffset .45s cubic-bezier(.22,.9,.32,1)}
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="language-toggle" id="languageToggle" role="button" tabindex="0"><i class="fas fa-language"></i> <span id="langText">हिंदी</span></div>
+      <h1><i class="fas fa-seedling"></i> <span id="mainTitle">किसान मित्र - Crop Predictor</span></h1>
+      <p id="subtitle">आपकी फसल की भविष्यवाणी करने वाला स्मार्ट सलाहकार</p>
+    </div>
+
+    <div class="main-card">
+      <div class="input-section">
+        <h2 style="text-align:center;margin-bottom:18px"><i class="fas fa-edit"></i> <span id="formTitle">फसल की जानकारी दें</span></h2>
+
+        <form id="cropForm">
+          <div class="form-group">
+            <label id="soilLabel">मिट्टी का प्रकार
+              <i class="fas fa-info-circle" title="मिट्टी का प्रकार"></i>
+            </label>
+            <select id="soil" class="form-control" required>
+              <option value="" id="soilPlaceholder" disabled selected>मिट्टी चुनें</option>
+              <option value="alluvial">जलोढ़ मिट्टी | Alluvial</option>
+              <option value="loamy">दोमट मिट्टी | Loamy</option>
+              <option value="clay">चिकनी मिट्टी | Clay</option>
+              <option value="well-drained">अच्छी जल निकासी वाली मिट्टी | Well-drained</option>
+              <option value="red">लाल मिट्टी | Red</option>
+              <option value="black">काली मिट्टी | Black</option>
+              <option value="sandy">रेतीली मिट्टी | Sandy</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label id="seasonLabel">बुवाई का मौसम</label>
+            <select id="sown" class="form-control" required>
+              <option value="" id="seasonPlaceholder" disabled selected>मौसम चुनें</option>
+              <option value="kharif">खरीफ | Kharif</option>
+              <option value="rabi">रबी | Rabi</option>
+              <option value="zaid">जायद | Zaid</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label id="phLabel">मिट्टी का pH <span class="bilingual">(typical 0 - 14)</span></label>
+            <div class="input-with-gauge">
+              <input id="soil_ph" class="form-control" type="number" step="any" placeholder="e.g. 7.0" required>
+              <div class="mini-gauge" id="g_soil_ph"></div>
+              <div class="value-badge" id="v_soil_ph">—</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label id="tempLabel">तापमान <span class="bilingual">(°C)</span></label>
+              <div class="input-with-gauge">
+                <input id="temp" class="form-control" type="number" step="any" placeholder="e.g. 25" required>
+                <div class="mini-gauge" id="g_temp"></div>
+                <div class="value-badge" id="v_temp">—</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label id="humidityLabel">आर्द्रता <span class="bilingual">(%)</span></label>
+              <div class="input-with-gauge">
+                <input id="humidity" class="form-control" type="number" step="any" placeholder="e.g. 60" required>
+                <div class="mini-gauge" id="g_humidity"></div>
+                <div class="value-badge" id="v_humidity">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label id="nitrogenLabel">नाइट्रोजन (N) <span class="bilingual">(kg/ha)</span></label>
+              <div class="input-with-gauge">
+                <input id="nitrogen" class="form-control" type="number" step="any" placeholder="e.g. 50">
+                <div class="mini-gauge" id="g_nitrogen"></div>
+                <div class="value-badge" id="v_nitrogen">—</div>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label id="phosphorusLabel">फास्फोरस (P) <span class="bilingual">(kg/ha)</span></label>
+              <div class="input-with-gauge">
+                <input id="phosphorus" class="form-control" type="number" step="any" placeholder="e.g. 25">
+                <div class="mini-gauge" id="g_phosphorus"></div>
+                <div class="value-badge" id="v_phosphorus">—</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label id="potassiumLabel">पोटैशियम (K) <span class="bilingual">(kg/ha)</span></label>
+            <div class="input-with-gauge">
+              <input id="potassium" class="form-control" type="number" step="any" placeholder="e.g. 30">
+              <div class="mini-gauge" id="g_potassium"></div>
+              <div class="value-badge" id="v_potassium">—</div>
+            </div>
+          </div>
+
+          <button class="predict-btn" id="predictBtnEl" type="submit"><i class="fas fa-magic"></i> <span id="predictBtn">फसल की भविष्यवाणी करें</span></button>
+        </form>
+      </div>
+
+      <div class="output-section">
+        <div id="resultsContainer" style="width:100%;max-width:420px">
+          <div class="result-card" id="emptyState">
+            <div style="text-align:center">
+              <i class="fas fa-seedling" style="font-size:32px;color:#bfcfe0"></i>
+              <p style="color:#666;margin-top:8px">कृपया विवरण भरें<br><span class="bilingual">Please fill the details to get crop predictions</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script>
+/* ---------- Language & small existing logic (kept) ---------- */
+let currentLang = 'hi';
+const translations = {
+  hi:{ langText:"English", mainTitle:"किसान मित्र - Crop Predictor", subtitle:"आपकी फसल की भविष्यवाणी करने वाला स्मार्ट सलाहकार", formTitle:"फसल की जानकारी दें", recommendedCrop:"सुझावित फसल", waterSource:"पानी का स्रोत", cropDuration:"फसल की अवधि", waterRequired:"पानी की आवश्यकता", bestSuited:"आपकी मिट्टी के अनुकूल", optimalIrrigation:"बेहतर सिंचाई के लिए", sowingToHarvest:"बुवाई से कटाई तक", perKgProduction:"प्रति किलो उत्पादन", predictBtn:"फसल की भविष्यवाणी करें", emptyStateText:"कृपया विवरण भरें<br><span class=\"bilingual\">Please fill the details to get crop predictions</span>", loadingText:"भविष्यवाणी हो रही है...<br><span class=\"bilingual\">Analyzing your data...</span>" },
+  en:{ langText:"हिंदी", mainTitle:"Farmer Friend - Crop Predictor", subtitle:"Your Smart Agricultural Advisor for Crop Prediction", formTitle:"Enter Crop Details", recommendedCrop:"Recommended Crop", waterSource:"Water Source", cropDuration:"Crop Duration", waterRequired:"Water Required", bestSuited:"Best suited for your soil", optimalIrrigation:"For optimal irrigation", sowingToHarvest:"From sowing to harvest", perKgProduction:"Per kg of production", predictBtn:"Predict Crop", emptyStateText:"Please fill the details to get crop predictions", loadingText:"Analyzing your data..." }
+};
+function updateLanguage(){
+  const lang = currentLang;
+  document.getElementById('langText').textContent = translations[lang].langText;
+  document.getElementById('mainTitle').textContent = translations[lang].mainTitle;
+  document.getElementById('subtitle').textContent = translations[lang].subtitle;
+  document.getElementById('formTitle').textContent = translations[lang].formTitle;
+  document.getElementById('predictBtn').textContent = translations[lang].predictBtn;
+}
+document.getElementById('languageToggle').addEventListener('click', ()=>{ currentLang = currentLang==='hi' ? 'en' : 'hi'; updateLanguage(); });
+
+/* ---------- Simple crop DB & mapping ---------- */
+const cropDatabase = {
+  rice:{ label:'🌾 धान | Rice', water_source:'🏞️ नदी | River', duration:'⏰ 120 दिन | 120 days', water_required:'💧 1200 L/kg' },
+  wheat:{ label:'🌾 गेहूं | Wheat', water_source:'🕳️ कुआं | Borewell', duration:'⏰ 110 दिन | 110 days', water_required:'💧 800 L/kg' },
+  maize:{ label:'🌽 मक्का | Maize', water_source:'💦 ड्रिप | Drip', duration:'⏰ 95 दिन | 95 days', water_required:'💧 600 L/kg' },
+  cotton:{ label:'🌸 कपास | Cotton', water_source:'🌧️ बारिश | Rain', duration:'⏰ 180 दिन | 180 days', water_required:'💧 1800 L/kg' },
+  pulses:{ label:'🫘 दाल | Pulses', water_source:'🏊 तालाब | Pond', duration:'⏰ 85 दिन | 85 days', water_required:'💧 400 L/kg' },
+  chickpea:{ label:'🌰 चना | Chickpea', water_source:'💦 ड्रिप | Drip', duration:'⏰ 100 दिन | 100 days', water_required:'💧 350 L/kg' },
+  potato:{ label:'🥔 आलू | Potato', water_source:'🚰 ट्यूबवेल | Tubewell', duration:'⏰ 90 दिन | 90 days', water_required:'💧 500 L/kg' },
+  sunflower:{ label:'🌻 सूरजमुखी | Sunflower', water_source:'💧 स्प्रिंकलर | Sprinkler', duration:'⏰ 100 दिन | 100 days', water_required:'💧 700 L/kg' },
+  cucumber:{ label:'🥒 खीरा | Cucumber', water_source:'💦 ड्रिप | Drip', duration:'⏰ 60 दिन | 60 days', water_required:'💧 400 L/kg' },
+  sorghum:{ label:'🌽 ज्वार | Sorghum', water_source:'🌧️ बारिश | Rain', duration:'⏰ 110 दिन | 110 days', water_required:'💧 650 L/kg' },
+  pearl:{ label:'🌿 बाजरा | Pearl Millet', water_source:'🌧️ बारिश | Rain', duration:'⏰ 90 दिन | 90 days', water_required:'💧 500 L/kg' },
+  barley:{ label:'🌾 जौ | Barley', water_source:'💦 ड्रिप | Drip', duration:'⏰ 95 दिन | 95 days', water_required:'💧 550 L/kg' }
+};
+/* map predicted label text to a key */
+function mapPredictionToCropKey(predLabel){
+  const s = (''+predLabel).toLowerCase();
+  if(s.includes('rice')||s.includes('धान')) return 'rice';
+  if(s.includes('wheat')||s.includes('गेहूं')) return 'wheat';
+  if(s.includes('maize')||s.includes('मक्का')) return 'maize';
+  if(s.includes('cotton')||s.includes('कपास')) return 'cotton';
+  if(s.includes('pulse')||s.includes('दाल')) return 'pulses';
+  if(s.includes('chick')||s.includes('चना')) return 'chickpea';
+  if(s.includes('potato')||s.includes('आलू')) return 'potato';
+  if(s.includes('sunflower')||s.includes('सूरज')) return 'sunflower';
+  if(s.includes('cucumber')||s.includes('खीरा')) return 'cucumber';
+  if(s.includes('sorghum')||s.includes('ज्वार')) return 'sorghum';
+  if(s.includes('pearl')||s.includes('बाजरा')) return 'pearl';
+  if(s.includes('barley')||s.includes('जौ')) return 'barley';
+  return 'wheat';
+}
+
+/* ---------- Ideal ranges per crop (for pH, temp, humidity, N,P,K) ---------- 
+   Values are [minIdeal, maxIdeal] for the green zone.
+*/
+const cropIdealRanges = {
+  rice: { soil_ph:[5.5,7.5], temp:[20,30], humidity:[70,95], nitrogen:[60,140], phosphorus:[20,40], potassium:[40,120] },
+  wheat:{ soil_ph:[6.0,7.5], temp:[10,25], humidity:[40,70], nitrogen:[40,80], phosphorus:[20,40], potassium:[20,60] },
+  maize:{ soil_ph:[5.5,7.5], temp:[20,32], humidity:[60,80], nitrogen:[80,200], phosphorus:[30,60], potassium:[40,140] },
+  cotton:{ soil_ph:[6.0,8.0], temp:[20,30], humidity:[50,80], nitrogen:[30,70], phosphorus:[20,50], potassium:[40,120] },
+  pulses:{ soil_ph:[6.0,7.5], temp:[18,28], humidity:[40,70], nitrogen:[0,30], phosphorus:[15,40], potassium:[10,60] },
+  chickpea:{ soil_ph:[6.0,8.0], temp:[15,25], humidity:[30,60], nitrogen:[10,40], phosphorus:[15,40], potassium:[10,60] },
+  potato:{ soil_ph:[5.0,6.5], temp:[15,22], humidity:[60,80], nitrogen:[80,160], phosphorus:[40,80], potassium:[150,300] },
+  sunflower:{ soil_ph:[6.0,7.5], temp:[20,30], humidity:[40,70], nitrogen:[40,80], phosphorus:[30,60], potassium:[40,120] },
+  cucumber:{ soil_ph:[5.5,7.0], temp:[18,28], humidity:[60,85], nitrogen:[60,140], phosphorus:[30,60], potassium:[80,160] },
+  sorghum:{ soil_ph:[5.5,7.5], temp:[22,34], humidity:[40,70], nitrogen:[30,90], phosphorus:[20,50], potassium:[20,80] },
+  pearl:{ soil_ph:[5.5,7.0], temp:[25,35], humidity:[30,60], nitrogen:[10,50], phosphorus:[10,30], potassium:[10,50] },
+  barley:{ soil_ph:[6.0,7.5], temp:[10,20], humidity:[40,70], nitrogen:[30,80], phosphorus:[20,50], potassium:[20,80] }
+};
+
+/* ---------- createMultiZoneMiniGauge ----------
+   Creates a mini gauge with three colored arc segments:
+   red (bad), yellow (ok), green (ideal). Caller can later
+   call .update(value) and .setZones(zones) where zones
+   are absolute ranges inside [min,max].
+*/
+function createMultiZoneMiniGauge(containerId, opts = {}) {
+  const container = document.getElementById(containerId);
+  if(!container) return { update:()=>{}, setZones:()=>{} };
+  const min = (opts.min!=null)?opts.min:0;
+  const max = (opts.max!=null)?opts.max:100;
+  const sizeW = 120, sizeH = 72;
+  const arcR = 50;
+  const arcLen = Math.PI * arcR; // approx path length for semicircle
+  const svgId = containerId + '_svg';
+  container.innerHTML = `
+    <svg id="${svgId}" viewBox="0 0 ${sizeW} ${sizeH}" aria-hidden="true" role="img">
+      <defs>
+        <filter id="${svgId}_shadow" x="-20%" y="-20%" width="140%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#000" flood-opacity="0.12"/>
+        </filter>
+      </defs>
+
+      <!-- background arc -->
+      <path d="M10 ${sizeH-12} A ${arcR} ${arcR} 0 0 1 ${sizeW-10} ${sizeH-12}" fill="none" stroke="#eef6f7" stroke-width="12" stroke-linecap="round"/>
+      <!-- colored segments (red,yellow,green) -->
+      <path id="${svgId}_seg_red"  d="M10 ${sizeH-12} A ${arcR} ${arcR} 0 0 1 ${sizeW-10} ${sizeH-12}" fill="none" stroke="#ff6b6b" stroke-width="12" stroke-linecap="butt" class="arc" stroke-dasharray="0 ${arcLen}"/>
+      <path id="${svgId}_seg_yellow" d="M10 ${sizeH-12} A ${arcR} ${arcR} 0 0 1 ${sizeW-10} ${sizeH-12}" fill="none" stroke="#ffcc66" stroke-width="12" stroke-linecap="butt" class="arc" stroke-dasharray="0 ${arcLen}"/>
+      <path id="${svgId}_seg_green" d="M10 ${sizeH-12} A ${arcR} ${arcR} 0 0 1 ${sizeW-10} ${sizeH-12}" fill="none" stroke="#69d6c5" stroke-width="12" stroke-linecap="round" class="arc" stroke-dasharray="0 ${arcLen}"/>
+      <!-- ticks group -->
+      <g transform="translate(${sizeW/2}, ${sizeH-12})" id="${svgId}_ticks"></g>
+      <!-- needle -->
+      <g transform="translate(${sizeW/2}, ${sizeH-12})" id="${svgId}_needle">
+        <rect x="-2.5" y="-${arcR-6}" width="5" height="${arcR-6}" rx="2" fill="#ffffff" stroke="#bcdedf" class="needle"></rect>
+        <circle cx="0" cy="0" r="4" fill="#0b2a35" stroke="#222" stroke-width="0.5"></circle>
+      </g>
+    </svg>
+  `;
+  // add ticks
+  const ticksGroup = document.getElementById(svgId + '_ticks');
+  for(let i=0;i<=10;i++){
+    const ang = Math.PI * (i/10); // 0..PI
+    const x1 = Math.cos(ang - Math.PI) * arcR;
+    const y1 = Math.sin(ang - Math.PI) * arcR;
+    const x2 = Math.cos(ang - Math.PI) * (arcR-8);
+    const y2 = Math.sin(ang - Math.PI) * (arcR-8);
+    const line = document.createElementNS("http://www.w3.org/2000/svg","line");
+    line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+    line.setAttribute("stroke", "#e6f0f1"); line.setAttribute("stroke-width",(i%5===0)?2:1);
+    ticksGroup.appendChild(line);
+  }
+
+  const segRed = document.getElementById(svgId + '_seg_red');
+  const segYellow = document.getElementById(svgId + '_seg_yellow');
+  const segGreen = document.getElementById(svgId + '_seg_green');
+  const needle = document.querySelector(`#${svgId}_needle .needle`);
+
+  // default zones - whole arc red unless changed
+  let zones = { red: [min, max], yellow: null, green: null };
+
+  function clamp(v){ if(isNaN(v)) return NaN; return Math.max(min,Math.min(max,v)); }
+  function fractionOfRange(v){ return (v - min) / (max - min); }
+
+  function setZonePaths() {
+    // arcLen = PI*R
+    const total = arcLen;
+    // compute lengths for each zone in same order left->right across the semicircle (min->max)
+    // We'll create dasharray values to show only the portion of the arc for each path.
+    const redLen = (zones.red ? Math.max(0, (Math.min(max,zones.red[1]) - Math.max(min,zones.red[0])) / (max-min)) * total : 0);
+    const yellowLen = (zones.yellow ? Math.max(0, (Math.min(max,zones.yellow[1]) - Math.max(min,zones.yellow[0])) / (max-min)) * total : 0);
+    const greenLen = (zones.green ? Math.max(0, (Math.min(max,zones.green[1]) - Math.max(min,zones.green[0])) / (max-min)) * total : 0);
+
+    // We need offsets so each segment occupies the correct portion starting from left.
+    // Calculate the starting offset for each: cumulated length of previous segments.
+    const segs = [];
+    // order of rendering: red, yellow, green. We'll compute their start offsets
+    let start = 0;
+    segs.push({el:segRed, len:redLen, start:start}); start += redLen;
+    segs.push({el:segYellow, len:yellowLen, start:start}); start += yellowLen;
+    segs.push({el:segGreen, len:greenLen, start:start}); start += greenLen;
+    // invisible remaining space
+    const remaining = Math.max(0, total - start);
+
+    // For each segment we set stroke-dasharray so that the first value is segment length then remaining to hide rest.
+    segs.forEach(s=>{
+      if(s.len > 0) {
+        // set dasharray: [segmentLength, large gap]
+        s.el.setAttribute('stroke-dasharray', `${s.len} ${total}`);
+        // dashoffset should be total - (start + segmentLen) so segments align from left side
+        const offset = Math.max(0, total - (s.start + s.len));
+        s.el.setAttribute('stroke-dashoffset', offset);
+        s.el.style.opacity = 1;
+      } else {
+        s.el.setAttribute('stroke-dasharray', `0 ${total}`);
+        s.el.setAttribute('stroke-dashoffset', total);
+        s.el.style.opacity = 0.0001;
+      }
+    });
+  }
+
+  // initial set
+  setZonePaths();
+
+  function valToAngle(v){
+    if(isNaN(v)) return -90;
+    const pct = Math.max(0, Math.min(1, (v - min) / (max - min)));
+    return -90 + pct * 180;
+  }
+
+  function update(value){
+    const angle = valToAngle(value);
+    needle.style.transform = `rotate(${angle}deg)`;
+  }
+
+  function setZones(newZones){
+    // newZones shapes: { green:[gmin,gmax], yellow:[ymin,ymax], red:[rmin,rmax] }.
+    // We'll accept partial and compute complement zones automatically if red omitted.
+    zones = { red:null, yellow:null, green:null };
+    if(newZones.green) zones.green = [ Math.max(min,newZones.green[0]), Math.min(max,newZones.green[1]) ];
+    if(newZones.yellow) zones.yellow = [ Math.max(min,newZones.yellow[0]), Math.min(max,newZones.yellow[1]) ];
+    if(newZones.red) zones.red = [ Math.max(min,newZones.red[0]), Math.min(max,newZones.red[1]) ];
+
+    // If red not provided we compute red as remaining area
+    if(!zones.red) {
+      // Build intervals occupied by green and yellow and subtract from whole to get red segments.
+      // For simplicity merge green and yellow into occupied spans:
+      const occupied = [];
+      if(zones.green) occupied.push(zones.green);
+      if(zones.yellow) occupied.push(zones.yellow);
+      // sort and merge
+      occupied.sort((a,b)=>a[0]-b[0]);
+      const merged = [];
+      for(const it of occupied){
+        if(!merged.length) merged.push(it);
+        else {
+          const last = merged[merged.length-1];
+          if(it[0] <= last[1]) last[1] = Math.max(last[1], it[1]); else merged.push(it);
+        }
+      }
+      // compute red as gaps between min..max
+      const redIntervals = [];
+      let cur = min;
+      for(const m of merged){
+        if(m[0] > cur) redIntervals.push([cur, m[0]]);
+        cur = Math.max(cur, m[1]);
+      }
+      if(cur < max) redIntervals.push([cur, max]);
+      // compress red intervals into single span where possible (we'll set red zone covering union)
+      if(redIntervals.length) {
+        zones.red = [ redIntervals[0][0], redIntervals[redIntervals.length-1][1] ];
+      } else {
+        zones.red = null;
+      }
+    }
+
+    setZonePaths();
+  }
+
+  return { update, setZones, meta:{min,max} };
+}
+
+/* ---------- instantiate gauges with default ranges ---------- */
+const gaugeConfigs = {
+  soil_ph:{min:0,max:14},
+  temp:{min:-30,max:60},
+  humidity:{min:0,max:100},
+  nitrogen:{min:0,max:300},
+  phosphorus:{min:0,max:300},
+  potassium:{min:0,max:300}
+};
+const gaugeInstances = {};
+for(const key in gaugeConfigs){
+  gaugeInstances[key] = createMultiZoneMiniGauge('g_' + key, gaugeConfigs[key]);
+}
+
+/* ---------- bind inputs to gauges and badges ---------- */
+function attachBindings(){
+  ['soil_ph','temp','humidity','nitrogen','phosphorus','potassium'].forEach(id=>{
+    const el = document.getElementById(id);
+    const badge = document.getElementById('v_' + id);
+    el.addEventListener('input', ()=>{
+      const v = parseFloat(el.value);
+      badge.textContent = isNaN(v)? '—' : (Number.isInteger(v) ? v : v);
+      gaugeInstances[id].update(v);
+    });
+    // initialize
+    const init = parseFloat(el.value);
+    badge.textContent = isNaN(init)? '—' : init;
+    gaugeInstances[id].update(isNaN(init)? gaugeConfigs[id].min : init);
+  });
+}
+attachBindings();
+
+/* ---------- compute heuristic scalability (confidence) ---------- */
+function computeScalability(formData){
+  const closeness = (val,idealMin,idealMax)=>{
+    if(isNaN(val)) return 0.5;
+    const idealCenter = (idealMin+idealMax)/2;
+    const tol = (idealMax - idealMin)/2 + (Math.abs(idealCenter)*0.05) + 0.1;
+    const diff = Math.abs(val - idealCenter);
+    return Math.max(0, 1 - (diff / (tol*2)));
+  };
+  const cropKey = mapPredictionToCropKey(formData.predictedCropLabel || '');
+  const ideals = cropIdealRanges[cropKey] || cropIdealRanges.wheat;
+  const phScore = closeness(formData.soil_ph, ideals.soil_ph[0], ideals.soil_ph[1]);
+  const tScore = closeness(formData.temp, ideals.temp[0], ideals.temp[1]);
+  const hScore = closeness(formData.humidity, ideals.humidity[0], ideals.humidity[1]);
+  const nScore = closeness(formData.nitrogen, ideals.nitrogen[0], ideals.nitrogen[1]);
+  const pScore = closeness(formData.phosphorus, ideals.phosphorus[0], ideals.phosphorus[1]);
+  const kScore = closeness(formData.potassium, ideals.potassium[0], ideals.potassium[1]);
+  const weights = { ph:0.2, temp:0.2, humidity:0.15, nitrogen:0.15, phosphorus:0.15, potassium:0.15 };
+  const weighted = phScore*weights.ph + tScore*weights.temp + hScore*weights.humidity + nScore*weights.nitrogen + pScore*weights.phosphorus + kScore*weights.potassium;
+  return Math.max(0,Math.min(1,weighted));
+}
+
+/* ---------- update gauges to show crop-specific ideal ranges ---------- */
+function applyCropIdealZonesFor(predictionLabel){
+  const cropKey = mapPredictionToCropKey(predictionLabel);
+  const ideals = cropIdealRanges[cropKey] || cropIdealRanges.wheat;
+  // For each gauge set green zone to ideal, yellow to a slightly wider area around ideal
+  Object.entries(ideals).forEach(([k,v])=>{
+    // ensure mapping from key names to input ids
+    const map = { soil_ph:'soil_ph', temp:'temp', humidity:'humidity', nitrogen:'nitrogen', phosphorus:'phosphorus', potassium:'potassium' };
+    const inputId = map[k];
+    if(!inputId) return;
+    const inst = gaugeInstances[inputId];
+    if(!inst) return;
+    const min = inst.meta.min, max = inst.meta.max;
+    // green zone = ideal v
+    const green = [ Math.max(min, v[0]), Math.min(max, v[1]) ];
+    // yellow zone = expand green by 30% of range each side
+    const expand = (v[1]-v[0]) * 0.5; // half-range margin
+    const yellow = [ Math.max(min, green[0]-expand), Math.min(max, green[1]+expand) ];
+    // set zones: green preferred, yellow next, red remainder
+    inst.setZones({ green, yellow });
+  });
+}
+
+/* ---------- Simulate ML prediction fallback (keeps your earlier heuristics) ---------- */
+function getPredictionKey(soil, sown, ph){
+  let phCategory = ph < 6.5 ? 'low_ph' : ph > 7.5 ? 'high_ph' : 'neutral_ph';
+  return `${soil}_${sown}_${phCategory}`;
+}
+function simulateMLPrediction(formData){
+  // simplified mapping like your original simulate. We'll return a label string included by cropDatabase mapping.
+  const soil = (formData.soil || '').toLowerCase();
+  const sown = (formData.sown || '');
+  if(sown === 'kharif'){
+    if(soil.includes('black')||soil.includes('cotton')) return {...cropDatabase.cotton};
+    if(soil.includes('alluvial')||soil.includes('clay')) return {...cropDatabase.rice};
+    if(soil.includes('red')) return {...cropDatabase.sorghum};
+    return {...cropDatabase.pearl};
+  } else if(sown === 'rabi'){
+    if(soil.includes('loamy')||soil.includes('alluvial')) return {...cropDatabase.wheat};
+    if(soil.includes('red')||soil.includes('laterite')) return {...cropDatabase.pulses};
+    if(soil.includes('black')) return {...cropDatabase.chickpea};
+    return {...cropDatabase.barley};
+  } else {
+    if(soil.includes('sandy')) return {...cropDatabase.maize};
+    if(soil.includes('loamy')) return {...cropDatabase.potato};
+    if(soil.includes('well-drained')) return {...cropDatabase.sunflower};
+    return {...cropDatabase.cucumber};
+  }
+}
+
+/* ---------- display results and draw scalability gauge ---------- */
+function displayResults(prediction){
+  const lang = currentLang;
+  const confPct = prediction.confidence ? Math.round(prediction.confidence * 100) : 0;
+  document.getElementById('resultsContainer').innerHTML = `
+    <div class="result-card">
+      <div style="display:flex;justify-content:center;align-items:center;gap:12px;flex-direction:column">
+        <div style="font-weight:700;font-size:1.1rem">${translations[lang].recommendedCrop}</div>
+        <div style="font-size:1.2rem;font-weight:800">${prediction.crop}</div>
+        <div style="color:#666;margin-top:6px">${translations[lang].bestSuited}</div>
+      </div>
+    </div>
+
+    <div class="result-card">
+      <div style="font-weight:700">${translations[lang].waterSource}</div>
+      <div style="font-weight:800">${prediction.water_source}</div>
+    </div>
+
+    <div class="result-card">
+      <div style="font-weight:700">${translations[lang].cropDuration}</div>
+      <div style="font-weight:800">${prediction.duration}</div>
+    </div>
+
+    <div class="result-card">
+      <div style="font-weight:700">${translations[lang].waterRequired}</div>
+      <div style="font-weight:800">${prediction.water_required}</div>
+    </div>
+
+    <div class="result-card" style="border-left:5px solid #2196F3">
+      <div style="display:flex;align-items:center;gap:16px;justify-content:space-between">
+        <div>
+          <div style="font-weight:700">Scalability</div>
+          <div style="font-size:1.4rem;font-weight:800">${confPct}%</div>
+          <div style="color:#666;font-size:0.85rem;margin-top:6px">Probability of successful crop</div>
+        </div>
+        <div id="scalabilityGauge" style="width:160px;height:100px"></div>
+      </div>
+    </div>
+  `;
+  // create scalability gauge (0..100)
+  const boxId = 'scal_g_box';
+  document.getElementById('scalabilityGauge').innerHTML = `<div id="${boxId}" style="width:100%;height:100%"></div>`;
+  const scalG = createMultiZoneMiniGauge(boxId, {min:0,max:100});
+  scalG.setZones({ green:[70,100], yellow:[40,70] });
+  scalG.update(confPct);
+
+  // update input gauges to show crop ideal zones
+  applyCropIdealZonesFor(prediction.crop);
+}
+
+/* ---------- handle submission (uses backend if available else simulate) ---------- */
+async function handleFormSubmission(formData){
+  // show "loading" experience quickly
+  document.getElementById('resultsContainer').innerHTML = `<div class="result-card"><div style="text-align:center;color:#666">Analyzing…</div></div>`;
+  // try backend (if you have one). For this demo we'll fallback immediately to simulate.
+  try {
+    // backend call could go here; for now use simulate
+    let prediction = simulateMLPrediction(formData);
+    // attach confidence computed from our heuristic
+    const conf = computeScalability({...formData, predictedCropLabel: prediction.label || prediction.crop});
+    prediction.confidence = conf;
+    // display
+    displayResults(prediction);
+  } catch(e){
+    console.error(e);
+    document.getElementById('resultsContainer').innerHTML = `<div class="result-card"><div style="color:#f44336">Error computing prediction</div></div>`;
+  }
+}
+
+/* ---------- wire the form ---------- */
+document.getElementById('cropForm').addEventListener('submit', async (ev)=>{
+  ev.preventDefault();
+  const soil = document.getElementById('soil').value;
+  const sown = document.getElementById('sown').value;
+  const soil_ph = parseFloat(document.getElementById('soil_ph').value);
+  const temp = parseFloat(document.getElementById('temp').value);
+  const humidity = parseFloat(document.getElementById('humidity').value);
+  const nitrogen = parseFloat(document.getElementById('nitrogen').value);
+  const phosphorus = parseFloat(document.getElementById('phosphorus').value);
+  const potassium = parseFloat(document.getElementById('potassium').value);
+
+  if(!soil || !sown || isNaN(soil_ph) || isNaN(temp) || isNaN(humidity)){
+    alert('कृपया सभी आवश्यक फ़ील्ड भरें / Please fill required fields');
+    return;
+  }
+
+  const formData = { soil, sown, soil_ph, temp, humidity, nitrogen: isNaN(nitrogen)?0:nitrogen, phosphorus: isNaN(phosphorus)?0:phosphorus, potassium: isNaN(potassium)?0:potassium };
+  await handleFormSubmission(formData);
+});
+
+/* ---------- initialize UI ---------- */
+updateLanguage();
+function initDemo(){
+  // set default gauge zones (generic)
+  Object.values(gaugeInstances).forEach(inst=>{
+    inst.setZones({ green:[ (inst.meta.min + inst.meta.max)/3, (inst.meta.min + inst.meta.max)*2/3 ], yellow:[ (inst.meta.min + inst.meta.max)/6, (inst.meta.min + inst.meta.max)*5/6 ] });
+  });
+}
+initDemo();
+
+</script>
+</body>
+</html>
