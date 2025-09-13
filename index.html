@@ -323,6 +323,31 @@
             font-size:0.9rem;
             color:#666;
         }
+
+        /* NPK gauges container */
+        .npk-gauges {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 12px;
+        }
+        .npk-gauge {
+            width: 30%;
+            min-width: 180px;
+            text-align: center;
+        }
+        .npk-meta {
+            margin-top: 8px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        @media (max-width: 900px) {
+            .npk-gauge { width: 45%; }
+        }
+        @media (max-width: 480px) {
+            .npk-gauge { width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -807,7 +832,7 @@
             return svg;
         }
 
-        function displayResults(prediction, inputCompletenessScore = null, derivedProbability = null) {
+        function displayResults(prediction, inputCompletenessScore = null, derivedProbability = null, npkValues = null) {
             const lang = currentLang;
 
             // Build the basic result cards (crop, water, duration, water_required)
@@ -850,14 +875,11 @@
             `;
 
             // Insert gauge + Probability block
-            // inputCompletenessScore: number 0-100 representing how many numeric fields filled
-            // derivedProbability: if provided, a number 0-100 representing probability of growing
             if (inputCompletenessScore === null) {
                 // default to 0 if not supplied
                 inputCompletenessScore = 0;
             }
 
-            // If backend provided a 'confidence' field, use that for probability; otherwise use derivedProbability.
             const probabilityPercent = prediction.confidence ? Math.round(prediction.confidence * 100) : (derivedProbability !== null ? Math.round(derivedProbability) : null);
 
             // Compose gauge section
@@ -891,6 +913,51 @@
                 </div>
             `;
 
+            // NPK gauges: show three semicircular gauges for Nitrogen, Phosphorus, Potassium
+            // npkValues expected as { nitrogen, phosphorus, potassium } with numeric values
+            if (!npkValues) {
+                npkValues = { nitrogen: null, phosphorus: null, potassium: null };
+            }
+
+            // get ideal ranges based on predicted crop
+            const ideal = getIdealNPK(prediction.crop || '');
+
+            function makeNPKGaugeHtml(label, value, idealRange) {
+                const provided = (typeof value === 'number' && Number.isFinite(value));
+                let percent = 0;
+                let statusText = 'Not provided';
+                if (provided) {
+                    percent = computeNPKPercent(value, idealRange.min, idealRange.max);
+                    // status text
+                    if (percent < 40) statusText = 'Low';
+                    else if (percent <= 60) statusText = 'Near ideal';
+                    else statusText = 'High';
+                }
+                const diffText = provided ? `${value} kg/ha (ideal ${idealRange.min}-${idealRange.max})` : '—';
+                return `
+                    <div class="npk-gauge">
+                        <div style="font-weight:600; margin-bottom:6px;">${label}</div>
+                        ${buildSemiGauge(percent, { size: 260, stroke: 14 })}
+                        <div class="npk-meta">${diffText}<br/><strong>${statusText}</strong></div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="result-card" style="border-left-color: #43A047;">
+                    <div class="result-title">
+                        <i class="fas fa-flask"></i>
+                        N-P-K Levels (relative to ${prediction.crop})
+                    </div>
+                    <div class="npk-gauges">
+                        ${makeNPKGaugeHtml('Nitrogen (N)', npkValues.nitrogen, ideal.N)}
+                        ${makeNPKGaugeHtml('Phosphorus (P)', npkValues.phosphorus, ideal.P)}
+                        ${makeNPKGaugeHtml('Potassium (K)', npkValues.potassium, ideal.K)}
+                    </div>
+                    <div class="result-subtitle">Gauges indicate whether each nutrient is low / near ideal / high for the predicted crop.</div>
+                </div>
+            `;
+
             // If prediction.confidence exists, also show it explicitly in a card
             if (prediction.confidence) {
                 html += `
@@ -906,6 +973,64 @@
             }
 
             document.getElementById('resultsContainer').innerHTML = html;
+        }
+
+        // Compute a 0-100 percent for N/P/K relative to ideal range
+        // 0 => very low, ~50 => ideal mid, 100 => very high
+        function computeNPKPercent(value, idealMin, idealMax) {
+            if (!Number.isFinite(value) || !Number.isFinite(idealMin) || !Number.isFinite(idealMax) || idealMax <= idealMin) {
+                return 0;
+            }
+            // If below idealMin -> scale 0..50
+            if (value <= idealMin) {
+                const pct = (value / idealMin) * 50;
+                return Math.max(0, Math.min(50, Math.round(pct)));
+            }
+            // If within ideal range -> 40..60 mapped to 35..65 produce tighter near-ideal band
+            if (value > idealMin && value <= idealMax) {
+                const ratioWithin = (value - idealMin) / (idealMax - idealMin);
+                const pct = 40 + ratioWithin * 20; // 40..60
+                return Math.round(pct);
+            }
+            // If above idealMax -> scale 60..100
+            if (value > idealMax) {
+                // relative above
+                const aboveRatio = (value - idealMax) / Math.max(1, idealMax);
+                const pct = 60 + Math.min(40, aboveRatio * 40); // cap at 100
+                return Math.max(60, Math.min(100, Math.round(pct)));
+            }
+            return 50;
+        }
+
+        // Simple mapping of crop name to ideal NPK ranges (kg/ha).
+        // These are heuristic defaults used only to generate the gauge - tweak as needed.
+        function getIdealNPK(cropName) {
+            const name = (cropName || '').toLowerCase();
+            // default baseline
+            const defaultRange = { N: {min: 20, max: 80}, P: {min: 10, max: 40}, K: {min: 20, max: 80} };
+
+            // Specific crops heuristics (common broad ranges)
+            const map = [
+                { keywords: ['rice', 'धान'], ranges: { N: {min: 60, max: 140}, P: {min: 20, max: 60}, K: {min: 40, max: 120} } },
+                { keywords: ['wheat', 'गेहूँ', 'गेहू'], ranges: { N: {min: 80, max: 160}, P: {min: 30, max: 70}, K: {min: 30, max: 80} } },
+                { keywords: ['maize', 'मक्का', 'corn'], ranges: { N: {min: 80, max: 200}, P: {min: 30, max: 80}, K: {min: 40, max: 120} } },
+                { keywords: ['cotton', 'कपास'], ranges: { N: {min: 60, max: 120}, P: {min: 30, max: 60}, K: {min: 40, max: 120} } },
+                { keywords: ['pulses', 'दाल', 'lentil', 'chickpea', 'चना'], ranges: { N: {min: 10, max: 40}, P: {min: 20, max: 50}, K: {min: 20, max: 60} } },
+                { keywords: ['sorghum', 'ज्वार', 'pearl millet', 'bajra', 'बाजरा'], ranges: { N: {min: 30, max: 80}, P: {min: 15, max: 40}, K: {min: 20, max: 80} } },
+                { keywords: ['potato', 'आलू'], ranges: { N: {min: 120, max: 250}, P: {min: 40, max: 100}, K: {min: 180, max: 300} } },
+                { keywords: ['sunflower', 'सूरजमुखी'], ranges: { N: {min: 40, max: 120}, P: {min: 40, max: 80}, K: {min: 80, max: 160} } },
+                { keywords: ['cucumber', 'खीरा'], ranges: { N: {min: 60, max: 150}, P: {min: 40, max: 80}, K: {min: 60, max: 150} } },
+                { keywords: ['barley', 'जौ'], ranges: { N: {min: 50, max: 120}, P: {min: 25, max: 60}, K: {min: 30, max: 80} } }
+            ];
+
+            for (const item of map) {
+                for (const kw of item.keywords) {
+                    if (name.includes(kw)) {
+                        return item.ranges;
+                    }
+                }
+            }
+            return defaultRange;
         }
 
         function showNotification(message, type = 'info') {
@@ -1023,7 +1148,12 @@
                 }
 
                 setLoading(false);
-                displayResults(prediction, completenessScore, derivedProb);
+                // Pass NPK values to displayResults so gauges can be rendered
+                await displayResults(prediction, completenessScore, derivedProb, {
+                    nitrogen: formData.nitrogen,
+                    phosphorus: formData.phosphorus,
+                    potassium: formData.potassium
+                });
             } catch (error) {
                 console.error('Prediction error:', error);
                 setLoading(false);
