@@ -348,6 +348,59 @@
         @media (max-width: 480px) {
             .npk-gauge { width: 100%; }
         }
+
+        /* ========== semicircular analog meter (half-clock) ========== */
+        .semi-analog-wrapper {
+            width: 340px;
+            max-width: 92%;
+            margin: 8px auto 18px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .semi-analog {
+            width: 320px;
+            height: 160px;
+            border-radius: 160px 160px 0 0;
+            background: linear-gradient(180deg, rgba(255,255,255,0.95), rgba(245,245,245,0.9));
+            box-shadow: inset 0 -6px 18px rgba(0,0,0,0.06);
+            position: relative;
+            overflow: visible;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            padding-bottom: 8px;
+        }
+
+        /* SVG container inside */
+        .semi-clock-svg {
+            width: 90%;
+            height: auto;
+            display: block;
+        }
+
+        /* small center pivot */
+        .semi-analog .center-dot {
+            position: absolute;
+            left: 50%;
+            bottom: 24px;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background: #333;
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 0 4px rgba(0,0,0,0.05);
+        }
+
+        /* label under the meter */
+        .semi-analog-label {
+            text-align: center;
+            font-size: 0.9rem;
+            color: #444;
+            margin-top: 6px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -483,6 +536,30 @@
             </div>
 
             <div class="output-section">
+                <!-- semicircular analog meter (half-clock) - ADDED -->
+                <div class="semi-analog-wrapper" aria-hidden="false" id="semiAnalogWrapper">
+                    <div class="semi-analog" role="img" aria-label="Semicircular analog clock">
+                        <svg class="semi-clock-svg" viewBox="0 0 200 100" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" id="semiClockSvg">
+                            <!-- background semicircle -->
+                            <defs>
+                                <linearGradient id="semiGrad" x1="0%" x2="100%">
+                                    <stop offset="0%" stop-color="#e0f2ff"/>
+                                    <stop offset="100%" stop-color="#fff"/>
+                                </linearGradient>
+                            </defs>
+                            <path d="M10,90 A90,90 0 0 1 190,90" fill="url(#semiGrad)" stroke="#e9eef8" stroke-width="0.5"/>
+                            <!-- tick marks group -->
+                            <g id="semiTicks" transform="translate(100,90)"></g>
+                            <!-- hands group -->
+                            <g id="semiHands" transform="translate(100,90)"></g>
+                            <!-- center dot is drawn with HTML for crispness -->
+                        </svg>
+                        <div class="center-dot" aria-hidden="true"></div>
+                    </div>
+                    <div class="semi-analog-label" id="semiAnalogLabel">समय / Time</div>
+                </div>
+                <!-- end semicircular analog meter -->
+
                 <div id="resultsContainer" class="results-container">
                     <div class="empty-state">
                         <i class="fas fa-seedling" aria-hidden="true"></i>
@@ -660,7 +737,7 @@
                     }
                 } else if (formData.sown === 'rabi') {
                     if (formData.soil.includes('loamy') || formData.soil.includes('alluvial')) {
-                        prediction = { crop: '🌾 गेहूँ | Wheat', water_source: '🕳️ कुआं | Borewell', duration: '⏰ 110 दिन | 110 days', water_required: '💧 800 लीटर/किग्रा | 800 L/kg' };
+                        prediction = { crop: '🌾 गेहूं | Wheat', water_source: '🕳️ कुआं | Borewell', duration: '⏰ 110 दिन | 110 days', water_required: '💧 800 लीटर/किग्रा | 800 L/kg' };
                     } else if (formData.soil.includes('red') || formData.soil.includes('laterite')) {
                         prediction = { crop: '🫘 दाल | Pulses', water_source: '🏊 तालाब | Pond', duration: '⏰ 85 दिन | 85 days', water_required: '💧 400 लीटर/किग्रा | 400 L/kg' };
                     } else if (formData.soil.includes('black')) {
@@ -749,7 +826,8 @@
             if (isLoading) {
                 results.style.display = 'none';
                 loading.style.display = 'block';
-                loading.setAttribute('aria-hidden', 'false');\n                submitBtn.disabled = true;
+                loading.setAttribute('aria-hidden', 'false');
+                submitBtn.disabled = true;
                 submitBtn.style.opacity = '0.7';
                 submitBtn.style.cursor = 'not-allowed';
             } else {
@@ -1194,6 +1272,155 @@
             });
         });
 
+        // ==================== semicircular analog meter JS (half-clock) ====================
+        (function() {
+            const svg = document.getElementById('semiClockSvg');
+            const ticksG = document.getElementById('semiTicks');
+            const handsG = document.getElementById('semiHands');
+            const labelEl = document.getElementById('semiAnalogLabel');
+            if (!svg || !ticksG || !handsG) return;
+
+            const R = 90; // radius used in viewBox coords (100,90 origin)
+            const tickCount = 12; // hour ticks along half circle (12 ticks mapped to semi arc)
+            // Precompute tick marks (once)
+            (function createTicks() {
+                const frag = document.createDocumentFragment();
+                for (let i = 0; i <= tickCount; i++) {
+                    // angle across semicircle: from 180deg to 0deg
+                    const t = i / tickCount;
+                    const angle = Math.PI - t * Math.PI; // radians
+                    const outer = polar(angle, R, 0); // relative to origin (100,90)
+                    const inner = polar(angle, R - (i % 3 === 0 ? 12 : 6), 0);
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', outer.x);
+                    line.setAttribute('y1', outer.y);
+                    line.setAttribute('x2', inner.x);
+                    line.setAttribute('y2', inner.y);
+                    line.setAttribute('stroke', '#9aa7c7');
+                    line.setAttribute('stroke-width', i % 3 === 0 ? '2.0' : '1.0');
+                    line.setAttribute('stroke-linecap', 'round');
+                    frag.appendChild(line);
+                    // optional small hour number for major ticks
+                    if (i % 3 === 0) {
+                        const txt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                        const tx = polar(angle, R - 22, 0).x;
+                        const ty = polar(angle, R - 22, 0).y + 4;
+                        txt.setAttribute('x', tx);
+                        txt.setAttribute('y', ty);
+                        txt.setAttribute('text-anchor', 'middle');
+                        txt.setAttribute('font-size', '8');
+                        txt.setAttribute('fill', '#44566E');
+                        // number mapping: map i (0..12) to analog hour label (9..3 style)
+                        // we'll show 6 numbers evenly: 6,7.5,9,10.5,12,1.5 etc — better to show simple markers
+                        txt.textContent = ''; // leave blank to keep clean; uncomment if you want numbers
+                        frag.appendChild(txt);
+                    }
+                }
+                ticksG.appendChild(frag);
+            })();
+
+            // create hand elements (hour, minute, second)
+            const hourHand = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            const minuteHand = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            const secondHand = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+
+            [hourHand, minuteHand, secondHand].forEach(h => {
+                h.setAttribute('x1', '0');
+                h.setAttribute('y1', '0');
+                h.setAttribute('stroke-linecap', 'round');
+                handsG.appendChild(h);
+            });
+
+            hourHand.setAttribute('stroke', '#2b4a6f');
+            hourHand.setAttribute('stroke-width', '4');
+
+            minuteHand.setAttribute('stroke', '#1f6fb2');
+            minuteHand.setAttribute('stroke-width', '3');
+
+            secondHand.setAttribute('stroke', '#e94f37');
+            secondHand.setAttribute('stroke-width', '1.6');
+
+            // Helpful function to convert polar coords to svg coords with origin (0,0) at center (100,90)
+            function polar(angleRad, radius, _unused) {
+                // convert to svg coords (origin at 100,90)
+                const cx = 0;
+                const cy = 0;
+                const x = Math.cos(angleRad) * radius;
+                const y = Math.sin(angleRad) * radius;
+                // We directly use these values; group has translate(100,90) applied
+                return { x: x, y: y };
+            }
+
+            // Set lengths of hands relative to radius (in svg group coords)
+            const hourLen = R * 0.45;
+            const minuteLen = R * 0.67;
+            const secondLen = R * 0.80;
+
+            // We'll update hands with requestAnimationFrame for smooth updates
+            let rafId = null;
+            function update() {
+                const now = new Date();
+                const hours = now.getHours() % 12;
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                const ms = now.getMilliseconds();
+
+                // Map to semicircle: 0..12 hours => angle Pi .. 0 (left to right)
+                // fraction around 12-hour scale
+                const hourFraction = (hours + minutes / 60 + seconds / 3600) / 12.0;
+                const minuteFraction = (minutes + seconds / 60 + ms/60000) / 60.0;
+                const secondFraction = (seconds + ms/1000) / 60.0;
+
+                // compute angles in radians for semicircle (Pi .. 0)
+                const hourAngle = Math.PI - hourFraction * Math.PI;
+                const minuteAngle = Math.PI - minuteFraction * Math.PI;
+                const secondAngle = Math.PI - secondFraction * Math.PI;
+
+                // compute end points (center at 0,0 because group already translated)
+                const hourEnd = polar(hourAngle, -hourLen);   // negative because our polar returns cos, sin that points right for 0 rad; adjust sign to point upward into semicircle
+                const minuteEnd = polar(minuteAngle, -minuteLen);
+                const secondEnd = polar(secondAngle, -secondLen);
+
+                hourHand.setAttribute('x2', hourEnd.x);
+                hourHand.setAttribute('y2', hourEnd.y);
+                minuteHand.setAttribute('x2', minuteEnd.x);
+                minuteHand.setAttribute('y2', minuteEnd.y);
+                secondHand.setAttribute('x2', secondEnd.x);
+                secondHand.setAttribute('y2', secondEnd.y);
+
+                // tiny center dot color change by seconds (subtle)
+                const centerDot = document.querySelector('.center-dot');
+                if (centerDot) {
+                    // pulse effect by ms
+                    const scale = 1 + Math.abs(Math.sin(ms / 200)) * 0.05;
+                    centerDot.style.transform = `translateX(-50%) scale(${scale})`;
+                }
+
+                // show localized label time (simple)
+                const hh = now.getHours().toString().padStart(2,'0');
+                const mm = now.getMinutes().toString().padStart(2,'0');
+                labelEl.textContent = `${hh}:${mm}`;
+
+                rafId = window.requestAnimationFrame(update);
+            }
+
+            // start when DOM is ready
+            window.addEventListener('load', function() {
+                if (!rafId) rafId = window.requestAnimationFrame(update);
+            });
+
+            // Pause updates when page hidden to save resources
+            document.addEventListener('visibilitychange', function() {
+                if (document.hidden) {
+                    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+                } else {
+                    if (!rafId) rafId = requestAnimationFrame(update);
+                }
+            });
+
+        })();
+        // ==================== end semicircular analog meter JS ====================
+
         // Initialize the application
         async function initializeApp() {
             updateLanguage();
@@ -1212,192 +1439,7 @@
             }
         }
 
-        // ----------------------------
-        // Inject semicircular analog meter (no changes elsewhere)
-        // This IIFE adds CSS and an analog semicircular clock into #resultsContainer.
-        // ----------------------------
-        (function injectSemiAnalog() {
-          const css = `
-          /* semicircular analog watch styles */
-          .analog-semi-container {
-            width: 100%;
-            display:flex;
-            justify-content:center;
-            margin-bottom: 16px;
-          }
-          .analog-semi {
-            width: 320px;
-            max-width: 92%;
-            height: 160px; /* half of width for semicircle */
-            position: relative;
-            pointer-events: none;
-          }
-          .analog-semi svg { display:block; width:100%; height:100%; }
-          .analog-center {
-            position:absolute;
-            left:50%;
-            bottom:0;
-            transform: translateX(-50%);
-            width:12px;
-            height:12px;
-            border-radius:50%;
-            background:#333;
-            z-index:5;
-            box-shadow: 0 0 6px rgba(0,0,0,0.2);
-          }
-          .clock-hand {
-            position:absolute;
-            left:50%;
-            bottom:8px; /* little offset so pivot is visible */
-            transform-origin: 50% 100%;
-            transform: translateX(-50%) rotate(0deg);
-            z-index:4;
-            pointer-events:none;
-          }
-          .hand-hour { width:4px; height:52px; background:#222; border-radius:4px; }
-          .hand-minute { width:3px; height:74px; background:#111; border-radius:3px; }
-          .hand-second { width:2px; height:86px; background:#e53935; border-radius:2px; opacity:0.9; }
-
-          /* small tick marks along semicircle */
-          .tick-container {
-            position:absolute;
-            left:0; right:0;
-            bottom:0;
-            height:100%;
-            pointer-events:none;
-          }
-          .tick {
-            position:absolute;
-            left:50%;
-            bottom:6px;
-            width:2px;
-            background:#666;
-            transform-origin: 50% 100%;
-            opacity:0.85;
-          }
-          `;
-
-          const style = document.createElement('style');
-          style.textContent = css;
-          document.head.appendChild(style);
-
-          const container = document.createElement('div');
-          container.className = 'analog-semi-container';
-          container.setAttribute('aria-hidden','false');
-          container.setAttribute('role','img');
-          container.setAttribute('aria-label','Semicircular analog clock showing current time');
-
-          const semi = document.createElement('div');
-          semi.className = 'analog-semi';
-          semi.setAttribute('id','analogSemiClock');
-
-          semi.innerHTML = `
-            <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <defs>
-                <linearGradient id="semiGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#667eea" stop-opacity="0.95"/>
-                  <stop offset="100%" stop-color="#764ba2" stop-opacity="0.95"/>
-                </linearGradient>
-              </defs>
-              <!-- background semicircle -->
-              <path d="M 10 150 A 150 150 0 0 1 310 150" fill="none" stroke="#eee" stroke-width="18" stroke-linecap="round" />
-              <path d="M 18 150 A 132 132 0 0 1 302 150" fill="none" stroke="url(#semiGrad)" stroke-width="12" stroke-linecap="round" opacity="0.95"/>
-              <!-- optional small arc markers -->
-              <g id="tickMarks"></g>
-            </svg>
-            <div class="tick-container" aria-hidden="true"></div>
-            <div class="clock-hand hand-hour" id="handHour" style="transform: translateX(-50%) rotate(0deg);"></div>
-            <div class="clock-hand hand-minute" id="handMinute" style="transform: translateX(-50%) rotate(0deg);"></div>
-            <div class="clock-hand hand-second" id="handSecond" style="transform: translateX(-50%) rotate(0deg);"></div>
-            <div class="analog-center" aria-hidden="true"></div>
-          `;
-
-          container.appendChild(semi);
-
-          const resultsEl = document.getElementById('resultsContainer');
-          if (resultsEl) {
-            resultsEl.insertBefore(container, resultsEl.firstChild);
-          } else {
-            const outSec = document.querySelector('.output-section');
-            if (outSec) outSec.insertBefore(container, outSec.firstChild);
-          }
-
-          const tickContainer = semi.querySelector('.tick-container');
-          const tickCount = 13; // ticks at each hour across semicircle (e.g., 0..12)
-          for (let i = 0; i < tickCount; i++) {
-            const tick = document.createElement('div');
-            tick.className = 'tick';
-            const fraction = i / (tickCount - 1); // 0..1
-            const angleDeg = 180 - (fraction * 180);
-            tick.style.height = (i % 3 === 0) ? '14px' : '8px';
-            tick.style.transform = `translateX(-50%) rotate(${angleDeg}deg) translateY(-${(semi.clientHeight/2 - 8)}px)`;
-            tickContainer.appendChild(tick);
-          }
-
-          function timeToAngles(date) {
-            const h = date.getHours() % 12;
-            const m = date.getMinutes();
-            const s = date.getSeconds();
-            const hourAngle = (h + m / 60 + s / 3600) * 30;
-            const minuteAngle = (m + s / 60) * 6;
-            const secondAngle = s * 6;
-            return { hourAngle, minuteAngle, secondAngle };
-          }
-
-          function applyHandTransforms(date) {
-            const { hourAngle, minuteAngle, secondAngle } = timeToAngles(date);
-            const hourHand = document.getElementById('handHour');
-            const minHand = document.getElementById('handMinute');
-            const secHand = document.getElementById('handSecond');
-
-            if (hourHand) hourHand.style.transform = `translateX(-50%) rotate(${hourAngle - 90}deg)`;
-            if (minHand) minHand.style.transform = `translateX(-50%) rotate(${minuteAngle - 90}deg)`;
-            if (secHand) secHand.style.transform = `translateX(-50%) rotate(${secondAngle - 90}deg)`;
-          }
-
-          function adjustHandSizes() {
-            const semiEl = document.getElementById('analogSemiClock');
-            if (!semiEl) return;
-            const w = semiEl.clientWidth;
-            const hour = document.getElementById('handHour');
-            const minute = document.getElementById('handMinute');
-            const second = document.getElementById('handSecond');
-            if (hour) {
-              hour.style.height = Math.round(w * 0.16) + 'px';
-              hour.style.width = Math.max(3, Math.round(w * 0.012)) + 'px';
-            }
-            if (minute) {
-              minute.style.height = Math.round(w * 0.22) + 'px';
-              minute.style.width = Math.max(2, Math.round(w * 0.008)) + 'px';
-            }
-            if (second) {
-              second.style.height = Math.round(w * 0.26) + 'px';
-              second.style.width = Math.max(2, Math.round(w * 0.006)) + 'px';
-            }
-          }
-
-          adjustHandSizes();
-          let rTO;
-          window.addEventListener('resize', () => {
-            clearTimeout(rTO);
-            rTO = setTimeout(() => {
-              adjustHandSizes();
-            }, 120);
-          });
-
-          function tick() {
-            const now = new Date();
-            applyHandTransforms(now);
-            const msToNext = 1000 - (now.getMilliseconds());
-            setTimeout(tick, msToNext);
-          }
-          tick();
-
-        })();
-
-        // Finally initialize app when DOM ready
         document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
-
