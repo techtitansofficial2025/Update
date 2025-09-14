@@ -660,7 +660,7 @@
                     }
                 } else if (formData.sown === 'rabi') {
                     if (formData.soil.includes('loamy') || formData.soil.includes('alluvial')) {
-                        prediction = { crop: '🌾 गेहूं | Wheat', water_source: '🕳️ कुआं | Borewell', duration: '⏰ 110 दिन | 110 days', water_required: '💧 800 लीटर/किग्रा | 800 L/kg' };
+                        prediction = { crop: '🌾 गेहूँ | Wheat', water_source: '🕳️ कुआं | Borewell', duration: '⏰ 110 दिन | 110 days', water_required: '💧 800 लीटर/किग्रा | 800 L/kg' };
                     } else if (formData.soil.includes('red') || formData.soil.includes('laterite')) {
                         prediction = { crop: '🫘 दाल | Pulses', water_source: '🏊 तालाब | Pond', duration: '⏰ 85 दिन | 85 days', water_required: '💧 400 लीटर/किग्रा | 400 L/kg' };
                     } else if (formData.soil.includes('black')) {
@@ -749,8 +749,7 @@
             if (isLoading) {
                 results.style.display = 'none';
                 loading.style.display = 'block';
-                loading.setAttribute('aria-hidden', 'false');
-                submitBtn.disabled = true;
+                loading.setAttribute('aria-hidden', 'false');\n                submitBtn.disabled = true;
                 submitBtn.style.opacity = '0.7';
                 submitBtn.style.cursor = 'not-allowed';
             } else {
@@ -1213,7 +1212,192 @@
             }
         }
 
+        // ----------------------------
+        // Inject semicircular analog meter (no changes elsewhere)
+        // This IIFE adds CSS and an analog semicircular clock into #resultsContainer.
+        // ----------------------------
+        (function injectSemiAnalog() {
+          const css = `
+          /* semicircular analog watch styles */
+          .analog-semi-container {
+            width: 100%;
+            display:flex;
+            justify-content:center;
+            margin-bottom: 16px;
+          }
+          .analog-semi {
+            width: 320px;
+            max-width: 92%;
+            height: 160px; /* half of width for semicircle */
+            position: relative;
+            pointer-events: none;
+          }
+          .analog-semi svg { display:block; width:100%; height:100%; }
+          .analog-center {
+            position:absolute;
+            left:50%;
+            bottom:0;
+            transform: translateX(-50%);
+            width:12px;
+            height:12px;
+            border-radius:50%;
+            background:#333;
+            z-index:5;
+            box-shadow: 0 0 6px rgba(0,0,0,0.2);
+          }
+          .clock-hand {
+            position:absolute;
+            left:50%;
+            bottom:8px; /* little offset so pivot is visible */
+            transform-origin: 50% 100%;
+            transform: translateX(-50%) rotate(0deg);
+            z-index:4;
+            pointer-events:none;
+          }
+          .hand-hour { width:4px; height:52px; background:#222; border-radius:4px; }
+          .hand-minute { width:3px; height:74px; background:#111; border-radius:3px; }
+          .hand-second { width:2px; height:86px; background:#e53935; border-radius:2px; opacity:0.9; }
+
+          /* small tick marks along semicircle */
+          .tick-container {
+            position:absolute;
+            left:0; right:0;
+            bottom:0;
+            height:100%;
+            pointer-events:none;
+          }
+          .tick {
+            position:absolute;
+            left:50%;
+            bottom:6px;
+            width:2px;
+            background:#666;
+            transform-origin: 50% 100%;
+            opacity:0.85;
+          }
+          `;
+
+          const style = document.createElement('style');
+          style.textContent = css;
+          document.head.appendChild(style);
+
+          const container = document.createElement('div');
+          container.className = 'analog-semi-container';
+          container.setAttribute('aria-hidden','false');
+          container.setAttribute('role','img');
+          container.setAttribute('aria-label','Semicircular analog clock showing current time');
+
+          const semi = document.createElement('div');
+          semi.className = 'analog-semi';
+          semi.setAttribute('id','analogSemiClock');
+
+          semi.innerHTML = `
+            <svg viewBox="0 0 320 160" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <defs>
+                <linearGradient id="semiGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stop-color="#667eea" stop-opacity="0.95"/>
+                  <stop offset="100%" stop-color="#764ba2" stop-opacity="0.95"/>
+                </linearGradient>
+              </defs>
+              <!-- background semicircle -->
+              <path d="M 10 150 A 150 150 0 0 1 310 150" fill="none" stroke="#eee" stroke-width="18" stroke-linecap="round" />
+              <path d="M 18 150 A 132 132 0 0 1 302 150" fill="none" stroke="url(#semiGrad)" stroke-width="12" stroke-linecap="round" opacity="0.95"/>
+              <!-- optional small arc markers -->
+              <g id="tickMarks"></g>
+            </svg>
+            <div class="tick-container" aria-hidden="true"></div>
+            <div class="clock-hand hand-hour" id="handHour" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="clock-hand hand-minute" id="handMinute" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="clock-hand hand-second" id="handSecond" style="transform: translateX(-50%) rotate(0deg);"></div>
+            <div class="analog-center" aria-hidden="true"></div>
+          `;
+
+          container.appendChild(semi);
+
+          const resultsEl = document.getElementById('resultsContainer');
+          if (resultsEl) {
+            resultsEl.insertBefore(container, resultsEl.firstChild);
+          } else {
+            const outSec = document.querySelector('.output-section');
+            if (outSec) outSec.insertBefore(container, outSec.firstChild);
+          }
+
+          const tickContainer = semi.querySelector('.tick-container');
+          const tickCount = 13; // ticks at each hour across semicircle (e.g., 0..12)
+          for (let i = 0; i < tickCount; i++) {
+            const tick = document.createElement('div');
+            tick.className = 'tick';
+            const fraction = i / (tickCount - 1); // 0..1
+            const angleDeg = 180 - (fraction * 180);
+            tick.style.height = (i % 3 === 0) ? '14px' : '8px';
+            tick.style.transform = `translateX(-50%) rotate(${angleDeg}deg) translateY(-${(semi.clientHeight/2 - 8)}px)`;
+            tickContainer.appendChild(tick);
+          }
+
+          function timeToAngles(date) {
+            const h = date.getHours() % 12;
+            const m = date.getMinutes();
+            const s = date.getSeconds();
+            const hourAngle = (h + m / 60 + s / 3600) * 30;
+            const minuteAngle = (m + s / 60) * 6;
+            const secondAngle = s * 6;
+            return { hourAngle, minuteAngle, secondAngle };
+          }
+
+          function applyHandTransforms(date) {
+            const { hourAngle, minuteAngle, secondAngle } = timeToAngles(date);
+            const hourHand = document.getElementById('handHour');
+            const minHand = document.getElementById('handMinute');
+            const secHand = document.getElementById('handSecond');
+
+            if (hourHand) hourHand.style.transform = `translateX(-50%) rotate(${hourAngle - 90}deg)`;
+            if (minHand) minHand.style.transform = `translateX(-50%) rotate(${minuteAngle - 90}deg)`;
+            if (secHand) secHand.style.transform = `translateX(-50%) rotate(${secondAngle - 90}deg)`;
+          }
+
+          function adjustHandSizes() {
+            const semiEl = document.getElementById('analogSemiClock');
+            if (!semiEl) return;
+            const w = semiEl.clientWidth;
+            const hour = document.getElementById('handHour');
+            const minute = document.getElementById('handMinute');
+            const second = document.getElementById('handSecond');
+            if (hour) {
+              hour.style.height = Math.round(w * 0.16) + 'px';
+              hour.style.width = Math.max(3, Math.round(w * 0.012)) + 'px';
+            }
+            if (minute) {
+              minute.style.height = Math.round(w * 0.22) + 'px';
+              minute.style.width = Math.max(2, Math.round(w * 0.008)) + 'px';
+            }
+            if (second) {
+              second.style.height = Math.round(w * 0.26) + 'px';
+              second.style.width = Math.max(2, Math.round(w * 0.006)) + 'px';
+            }
+          }
+
+          adjustHandSizes();
+          let rTO;
+          window.addEventListener('resize', () => {
+            clearTimeout(rTO);
+            rTO = setTimeout(() => {
+              adjustHandSizes();
+            }, 120);
+          });
+
+          function tick() {
+            const now = new Date();
+            applyHandTransforms(now);
+            const msToNext = 1000 - (now.getMilliseconds());
+            setTimeout(tick, msToNext);
+          }
+          tick();
+
+        })();
+
+        // Finally initialize app when DOM ready
         document.addEventListener('DOMContentLoaded', initializeApp);
     </script>
 </body>
 </html>
+
